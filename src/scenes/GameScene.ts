@@ -2,11 +2,15 @@ import Phaser from 'phaser';
 import { MergeTier } from '../types';
 import { spawnableTiers, tierById } from '../data/merge_ladder';
 import { t } from '../services/i18n';
+import { loadLocalBest, saveLocalBest } from '../services/saveLocal';
+import { submitBest } from '../services/supabase';
 
 // ゲーム本体のシーン（タップでケシカスを落として物理で積む）
 export class GameScene extends Phaser.Scene {
   private score = 0; // 現在のスコア
   private scoreText!: Phaser.GameObjects.Text; // スコア表示テキスト
+  private best = 0; // 自己ベスト（create時にロード）   
+  private bestText!: Phaser.GameObjects.Text; // ベスト表示テキスト（左上）
   private canDrop = true; // 今ドロップ可能か（クールタイム制御）
   private readonly dropCooldown = 600; // ドロップ後の待機時間（ミリ秒）
   private nextTierId = 1; // 次に落とす段階のid（NEXT）
@@ -56,6 +60,14 @@ export class GameScene extends Phaser.Scene {
       color: '#a8566b',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0).setDepth(1000); // 最前面に表示
+
+    // 自己ベストをロードして左上に常時表示する
+    this.best = loadLocalBest(); // 保存済みの自己ベスト（無ければ0）
+    this.bestText = this.add.text(wall + 4, 10, `${t('game.best')} ${this.best}`, {
+      fontSize: '22px',
+      color: '#a8566b',
+      fontStyle: 'bold',
+    }).setOrigin(0, 0).setDepth(1000); // 左上基準・最前面
 
     // NEXTプレビュー（右上。原点を右上に置き、右マージン10pxで配置）
     this.nextPreview = this.add.image(w - 30, 10, '')
@@ -249,16 +261,37 @@ export class GameScene extends Phaser.Scene {
   }
 
 
-  // スコアを加算して画面表示を更新する
+  /// スコアを加算して画面表示を更新する
   private addScore(points: number) {
     this.score += points;
     this.scoreText.setText(String(this.score));
+
+    // プレイ中に現在スコアがベストを超えたら左上表示も即時更新する
+    if (this.score > this.best) {
+      this.best = this.score;
+      this.bestText.setText(`${t('game.best')} ${this.best}`);
+    }
   }
 
   // ゲームオーバー処理（入力停止＋結果表示＋リトライ）
   private gameOver() {
     this.isGameOver = true;
+
+    // 保存済み（localStorage）のベストと比較する。
+    // this.bestはプレイ中にaddScoreで即時更新されるため、判定には使えない。
+    // 「今回の最終スコア」が「前回までの保存ベスト」を超えたかで判定する（only-if-best）
+    const savedBest = loadLocalBest();          // 前回までの保存ベスト
+    const isNewRecord = this.score > savedBest; // 今回が記録更新か
+
+    if (isNewRecord) {
+      this.best = this.score;     // 表示用ベストも最終スコアに揃える
+      saveLocalBest(this.best);   // localStorageへ保存（オフライン保証）
+      // 記録更新時のみサーバーへ送る。表示名は既定のL10N名（入力UIは④タイトルで実装）
+      void submitBest(t('name.default'), this.best); // 待たない（失敗してもゲーム進行優先）
+    }
+
     this.sound.play('sfx_gameover'); // ゲームオーバー音
+
     const w = this.scale.width;
     const h = this.scale.height;
 
@@ -272,9 +305,12 @@ export class GameScene extends Phaser.Scene {
     this.add.text(w / 2, h / 2, `${t('game.score')} ${this.score}`, {
       fontSize: '36px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(2001);
+    this.add.text(w / 2, h / 2 + 36, `${t('game.best')} ${this.best}`, {
+      fontSize: '28px', color: '#ffeef1',
+    }).setOrigin(0.5).setDepth(2001);
 
     // リトライボタン（タップでシーン再起動）
-    const retry = this.add.text(w / 2, h / 2 + 70, t('result.retry'), {
+    const retry = this.add.text(w / 2, h / 2 + 150, t('result.retry'), {
       fontSize: '40px', color: '#fce0e3', backgroundColor: '#a8566b',
       padding: { x: 24, y: 12 },
     }).setOrigin(0.5).setDepth(2001).setInteractive({ useHandCursor: true });;

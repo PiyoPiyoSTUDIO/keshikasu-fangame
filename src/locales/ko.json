@@ -2,6 +2,8 @@
   "common.loading": "로딩 중",
   "result.gameover": "게임 오버",
   "game.score": "점수",
+  "game.best": "최고점",
+  "name.default": "익명의 삐약이",
   "result.retry": "다시하기",
   "char.bee.name": "꿀벌",
   "char.shrimp.name": "꼬마새우",

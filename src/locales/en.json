@@ -2,6 +2,8 @@
   "common.loading": "Loading",
   "result.gameover": "Game Over",
   "game.score": "Score",
+  "game.best": "Best",
+  "name.default": "Anonymous Chick",
   "result.retry": "Retry",
   "char.bee.name": "Bee",
   "char.shrimp.name": "Shrimp",

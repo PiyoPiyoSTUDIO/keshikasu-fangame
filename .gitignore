@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# local env (secrets)
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.vscode/
+.DS_Store
+*.log

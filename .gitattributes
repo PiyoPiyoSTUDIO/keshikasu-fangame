@@ -1,0 +1,17 @@
+# テキストファイルの改行を自動正規化（環境差を吸収）
+* text=auto
+
+# バイナリは改行変換しない（破損防止）
+*.png binary
+*.wav binary
+*.woff2 binary
+*.pdf binary
+*.ico binary
+
+# ソース・テキストはLF固定（OS差で差分が出ないように）
+*.ts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
