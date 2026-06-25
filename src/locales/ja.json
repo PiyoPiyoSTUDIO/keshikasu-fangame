@@ -1,0 +1,17 @@
+{
+  "common.loading": "ロード中",
+  "result.gameover": "ゲームオーバー",
+  "game.score": "スコア",
+  "result.retry": "もう一度",
+  "char.bee.name": "はち",
+  "char.shrimp.name": "こえびちゃん",
+  "char.jellyfish.name": "くらげ",
+  "char.seaslug.name": "ウミウシ",
+  "char.rabbit.name": "うさぎ",
+  "char.pig.name": "ぶた",
+  "char.turtle.name": "かめ",
+  "char.unicorn.name": "ユニコーン",
+  "char.bear.name": "くま",
+  "char.whaleshark.name": "ジンベイ",
+  "char.mammoth.name": "マンモス"
+}

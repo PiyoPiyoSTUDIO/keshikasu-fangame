@@ -1,0 +1,17 @@
+{
+  "common.loading": "로딩 중",
+  "result.gameover": "게임 오버",
+  "game.score": "점수",
+  "result.retry": "다시하기",
+  "char.bee.name": "꿀벌",
+  "char.shrimp.name": "꼬마새우",
+  "char.jellyfish.name": "해파리",
+  "char.seaslug.name": "갯민숭달팽이",
+  "char.rabbit.name": "토끼",
+  "char.pig.name": "돼지",
+  "char.turtle.name": "거북",
+  "char.unicorn.name": "유니콘",
+  "char.bear.name": "곰",
+  "char.whaleshark.name": "고래상어",
+  "char.mammoth.name": "매머드"
+}

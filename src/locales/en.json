@@ -1,0 +1,17 @@
+{
+  "common.loading": "Loading",
+  "result.gameover": "Game Over",
+  "game.score": "Score",
+  "result.retry": "Retry",
+  "char.bee.name": "Bee",
+  "char.shrimp.name": "Shrimp",
+  "char.jellyfish.name": "Jellyfish",
+  "char.seaslug.name": "Sea Slug",
+  "char.rabbit.name": "Rabbit",
+  "char.pig.name": "Pig",
+  "char.turtle.name": "Turtle",
+  "char.unicorn.name": "Unicorn",
+  "char.bear.name": "Bear",
+  "char.whaleshark.name": "Whale Shark",
+  "char.mammoth.name": "Mammoth"
+}

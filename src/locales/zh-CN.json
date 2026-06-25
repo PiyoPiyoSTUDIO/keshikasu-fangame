@@ -1,0 +1,17 @@
+{
+  "common.loading": "加载中",
+  "result.gameover": "游戏结束",
+  "game.score": "分数",
+  "result.retry": "再来一次",
+  "char.bee.name": "蜜蜂",
+  "char.shrimp.name": "小虾",
+  "char.jellyfish.name": "水母",
+  "char.seaslug.name": "海蛞蝓",
+  "char.rabbit.name": "兔子",
+  "char.pig.name": "猪",
+  "char.turtle.name": "乌龟",
+  "char.unicorn.name": "独角兽",
+  "char.bear.name": "熊",
+  "char.whaleshark.name": "鲸鲨",
+  "char.mammoth.name": "猛犸象"
+}

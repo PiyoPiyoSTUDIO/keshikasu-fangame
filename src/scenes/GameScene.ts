@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MergeTier } from '../types';
 import { spawnableTiers, tierById } from '../data/merge_ladder';
+import { t } from '../services/i18n';
 
 // ゲーム本体のシーン（タップでケシカスを落として物理で積む）
 export class GameScene extends Phaser.Scene {
@@ -22,6 +23,15 @@ export class GameScene extends Phaser.Scene {
     const w = this.scale.width;
     const h = this.scale.height;
     const wall = 20; // 壁・床の厚み
+
+    // 合体パーティクル用の小さな丸テクスチャを一度だけ作る（専用画像不要）
+    if (!this.textures.exists('spark')) {
+      const gp = this.add.graphics();
+      gp.fillStyle(0xffffff, 1);   // 白い丸（tintで色を付ける）
+      gp.fillCircle(8, 8, 8);      // 半径8pxの円
+      gp.generateTexture('spark', 16, 16); // 'spark'キーで16x16テクスチャ化
+      gp.destroy();                // 元のgraphicsは破棄
+    }
 
     // 物理の壁・床（静的ボディ）
     this.matter.add.rectangle(w / 2, h - wall / 2, w, wall, { isStatic: true }); // 床
@@ -58,10 +68,13 @@ export class GameScene extends Phaser.Scene {
       this.dropKeshi(pointer.x);
     });
 
-    // 衝突したら合体判定を行う
+    // 衝突したら合体判定＋着地スクワッシュを行う
     this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) {
         this.tryMerge(pair.bodyA, pair.bodyB);
+        // 衝突した各ボディに初回着地スクワッシュを試みる
+        this.trySquash(pair.bodyA);
+        this.trySquash(pair.bodyB);
       }
     });
   }
@@ -112,7 +125,15 @@ export class GameScene extends Phaser.Scene {
 
     // 今のNEXTを落とす
     const tier = tierById(this.nextTierId)!;
-    this.spawn(tier, x, 70);
+
+    // 落下x座標を壁の内側に制限する（端をタップしても壁にめり込んで場外に出ないように）
+    const wall = 20; // create()の壁の厚みと同じ値
+    const minX = wall + tier.radius;                    // 左壁の内側＋半径
+    const maxX = this.scale.width - wall - tier.radius; // 右壁の内側−半径
+    const dropX = Phaser.Math.Clamp(x, minX, maxX);
+
+    this.spawn(tier, dropX, 70); // 制限後の座標で落とす
+    this.sound.play('sfx_drop'); // 落下音
 
     // 次のNEXTを決めてプレビュー更新
     this.pickNext();
@@ -173,6 +194,8 @@ export class GameScene extends Phaser.Scene {
 
     // 上位段階を1つ生成
     const merged = this.spawn(next, mx, my);
+    this.sound.play('sfx_merge'); // 合体音
+    this.popParticles(mx, my);    // 合体地点でパーティクルを弾く
 
     // ポップ演出（少し大きくしてから元に戻す）
     const base = merged.scale;
@@ -187,7 +210,44 @@ export class GameScene extends Phaser.Scene {
     // スコア加算（次段階のscore）
     this.addScore(next.score);
   }
-  
+
+  // 着地時のスクワッシュ＆ストレッチ（初回接触1回だけ）
+  private trySquash(body: MatterJS.BodyType) {
+    const sprite = body.gameObject as Phaser.Physics.Matter.Sprite | null;
+    if (!sprite) return;                       // 壁・床はgameObjectが無い
+    if (sprite.getData('merged')) return;      // 合体で消える個体には出さない
+    if (sprite.getData('squashed')) return;    // 既に1回演出済みならスキップ
+    sprite.setData('squashed', true);          // 以後はこの個体で再生しない
+
+    // 現在のscaleを基準に、横へ潰れて縦へ縮む（radius毎に元scaleが違うため倍率で扱う）
+    const base = sprite.scale;
+    this.tweens.add({
+      targets: sprite,
+      scaleX: base * 1.15,   // 横にふくらむ
+      scaleY: base * 0.85,   // 縦に潰れる
+      duration: 90,
+      yoyo: true,            // 元のscaleへ戻す
+      ease: 'Quad.easeOut',
+    });
+  }
+
+  // 合体地点で短く弾けるパーティクル（'spark'テクスチャを使用）
+  private popParticles(x: number, y: number) {
+    const emitter = this.add.particles(x, y, 'spark', {
+      speed: { min: 60, max: 160 },   // 飛び散る速度の幅
+      angle: { min: 0, max: 360 },    // 全方向へ
+      scale: { start: 0.6, end: 0 },  // だんだん小さく消える
+      alpha: { start: 0.9, end: 0 },  // だんだん透明に
+      lifespan: 400,                  // 1粒の寿命（ミリ秒）
+      quantity: 10,                   // 一度に出す粒数
+      tint: 0xe79bb0,                 // ピンク（背景に馴染む色）
+      emitting: false,                // 自動連射はオフ（explodeで1回だけ）
+    });
+    emitter.explode(10);              // 10粒を1回だけ弾く
+    // 寿命が尽きた頃にエミッターを片付ける（メモリ蓄積防止）
+    this.time.delayedCall(500, () => emitter.destroy());
+  }
+
 
   // スコアを加算して画面表示を更新する
   private addScore(points: number) {
@@ -198,6 +258,7 @@ export class GameScene extends Phaser.Scene {
   // ゲームオーバー処理（入力停止＋結果表示＋リトライ）
   private gameOver() {
     this.isGameOver = true;
+    this.sound.play('sfx_gameover'); // ゲームオーバー音
     const w = this.scale.width;
     const h = this.scale.height;
 
@@ -205,18 +266,18 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0.45).setDepth(2000);
 
     // 結果テキスト
-    this.add.text(w / 2, h / 2 - 60, 'GAME OVER', {
+    this.add.text(w / 2, h / 2 - 60, t('result.gameover'), {
       fontSize: '52px', color: '#ffffff', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(2001);
-    this.add.text(w / 2, h / 2, `Score ${this.score}`, {
+    this.add.text(w / 2, h / 2, `${t('game.score')} ${this.score}`, {
       fontSize: '36px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(2001);
 
     // リトライボタン（タップでシーン再起動）
-    const retry = this.add.text(w / 2, h / 2 + 70, 'RETRY', {
+    const retry = this.add.text(w / 2, h / 2 + 70, t('result.retry'), {
       fontSize: '40px', color: '#fce0e3', backgroundColor: '#a8566b',
       padding: { x: 24, y: 12 },
-    }).setOrigin(0.5).setDepth(2001).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5).setDepth(2001).setInteractive({ useHandCursor: true });;
 
     retry.on('pointerdown', () => this.scene.restart());
   }
