@@ -1,24 +1,49 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// URLと公開キーを環境変数から読み込む（公開キーはRLS前提で安全）
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-);
+// クライアントは遅延生成し、生成済みインスタンスをここに保持する
+let client: SupabaseClient | null = null;
+let initialized = false; // 初期化を一度だけ試みるためのフラグ
+
+// 必要時にクライアントを取得する。環境変数が無ければnullを返し、ランキングを黙って省略する
+function getClient(): SupabaseClient | null {
+  if (initialized) return client; // 二度目以降はキャッシュを返す
+  initialized = true;
+
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  // URL・キーが空なら生成しない（createClientは空URLでthrowするため）
+  if (!url || !key) {
+    return null; // ランキング機能のみ無効化。ゲーム本体は継続
+  }
+
+  // 公開キーはRLS前提で安全。生成失敗時もnullに倒してゲームを止めない
+  try {
+    client = createClient(url, key);
+  } catch {
+    client = null;
+  }
+  return client;
+}
 
 // 匿名ログイン（セッションが無ければ作成する）
 export async function ensureAnonSignIn(): Promise<void> {
-  const { data } = await supabase.auth.getSession();
+  const sb = getClient();
+  if (!sb) return; // 環境変数が無ければ何もしない
+  const { data } = await sb.auth.getSession();
   if (!data.session) {
-    await supabase.auth.signInAnonymously();
+    await sb.auth.signInAnonymously();
   }
 }
 
 // 自己ベストを保存する（1ユーザー1行をupsert）
 async function saveBest(name: string, best: number): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const sb = getClient();
+  if (!sb) return; // 環境変数が無ければスキップ
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) return; // セッション未確立時は黙ってスキップ
-  await supabase.from('scores').upsert(
+  await sb.from('scores').upsert(
+
     {
       user_id: user.id,                  // 自分の行を一意に特定
       name,
@@ -42,7 +67,9 @@ export async function submitBest(name: string, finalScore: number): Promise<void
 // ランキング上位を取得する（表示はタイトル画面で利用予定）
 export async function fetchTop(limit = 50): Promise<{ name: string; best: number }[]> {
   try {
-    const { data } = await supabase
+    const sb = getClient();
+    if (!sb) return []; // 環境変数が無ければ空配列
+    const { data } = await sb
       .from('scores')
       .select('name, best')
       .order('best', { ascending: false })
