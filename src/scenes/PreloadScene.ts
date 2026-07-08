@@ -25,6 +25,10 @@ export class PreloadScene extends Phaser.Scene {
     this.load.audio('sfx_merge', 'assets/audio/sfx_merge.wav');
     this.load.audio('sfx_gameover', 'assets/audio/sfx_gameover.wav');
 
+    // タイトル画面用の画像（背景＝草原シーン、ロゴ＝消しかす）
+    this.load.image('ui_title_bg', 'assets/ui/ui_title_bg.png');
+    this.load.image('logo_title', 'assets/logo/logo_title__ja.png');
+
     // 簡単な読み込み表示（中央のテキスト）
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2;
@@ -41,6 +45,6 @@ export class PreloadScene extends Phaser.Scene {
 
   create() {
     // 読み込みが終わったらゲーム画面へ
-    this.scene.start('GameScene');
+    this.scene.start('TitleScene');
   }
 }

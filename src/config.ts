@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 import { PreloadScene } from './scenes/PreloadScene';
+import { TitleScene } from './scenes/TitleScene';
 
 // ゲーム全体の設定（背景はケシカスの淡いピンク）
 export const gameConfig: Phaser.Types.Core.GameConfig = {
@@ -20,5 +21,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
       debug: false,            // 開発時のみtrueにする
     },
   },
-  scene: [PreloadScene, GameScene],                   // ゲームシーンを登録
+  scene: [PreloadScene, TitleScene, GameScene],                   // ゲームシーンを登録
 };
