@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { t } from '../services/i18n';
 import { loadLocalBest } from '../services/saveLocal';
+import { attachTapFeedback } from '../ui/tapFeedback';
 
 // タイトル画面のシーン（背景・ロゴ・START・自己ベストを配置）
 // ④の骨組み＋装飾。ランキング/言語ボタンは場所のみ確保し、機能は後続サイクルで実装する
@@ -56,7 +57,9 @@ export class TitleScene extends Phaser.Scene {
     // ここで中心基準のRectangleを明示すると、displayOrigin(＝幅/2・高さ/2)の補正が
     // 二重に掛かり、判定範囲がボタン半分ぶん左上へずれる（Phaser 4.2.0のソースで確認）
     start.setInteractive({ useHandCursor: true });
-    start.on('pointerdown', () => this.scene.start('GameScene'));
+    // タップで少し拡大→元の大きさへ戻ってからGameSceneへ移る。
+    // onceの既定はtrueなので、演出中に連打しても遷移は1回だけ
+    attachTapFeedback(this, start, () => this.scene.start('GameScene'));
 
     // STARTの上に人気2匹（ぶた・うさぎ）を乗せて軽くバウンスさせる
     const charY = btnY - btnH / 2 - 6;                         // ボタン上辺あたり
