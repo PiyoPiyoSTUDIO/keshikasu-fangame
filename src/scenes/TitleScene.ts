@@ -52,10 +52,10 @@ export class TitleScene extends Phaser.Scene {
 
     start.add([shadow, face, label]);
     start.setSize(btnW, btnH);
-    start.setInteractive(
-      new Phaser.Geom.Rectangle(-btnW / 2, -btnH / 2, btnW, btnH),
-      Phaser.Geom.Rectangle.Contains,
-    );
+    // Containerはwidth/heightからヒットエリアRectangle(0,0,w,h)を自動生成する。
+    // ここで中心基準のRectangleを明示すると、displayOrigin(＝幅/2・高さ/2)の補正が
+    // 二重に掛かり、判定範囲がボタン半分ぶん左上へずれる（Phaser 4.2.0のソースで確認）
+    start.setInteractive({ useHandCursor: true });
     start.on('pointerdown', () => this.scene.start('GameScene'));
 
     // STARTの上に人気2匹（ぶた・うさぎ）を乗せて軽くバウンスさせる
