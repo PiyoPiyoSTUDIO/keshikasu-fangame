@@ -1,16 +1,144 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-wp="default">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Keshikasu Merge</title>
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; background: #dcdcdc; }
-      #game { width: 100%; height: 100%; }
+      /* ===== 壁紙（キャンバス外）の共通変数 ===== */
+      :root {
+        --wp-bg:      #fce0e3;                 /* 背景ピンク（キャンバスと同色） */
+        --wp-line:    rgba(255, 255, 255, .55); /* 帯の区切り線 */
+        --wp-text:    rgba(255, 255, 255, .75); /* 流れる文字 */
+        --wp-angle:   -25deg;                  /* 斜め角度 */
+        --wp-dur:     50s;                     /* 1周の秒数（大きいほど遅い） */
+        --wp-font:    2.4vmax;                 /* 文字サイズ */
+        --wp-band-h:  5vmax;                   /* 帯の高さ */
+      }
+
+      /* シーンごとに壁紙を変えたい場合はここに追記する。
+         例) html[data-wp="game"] { --wp-dur: 40s; --wp-text: rgba(255,255,255,.4); } */
+
+      html, body {
+        margin: 0; padding: 0; height: 100%;
+        background: var(--wp-bg);
+      }
+
+      /* ===== 壁紙レイヤー（最背面・入力を奪わない） ===== */
+      #wallpaper {
+        position: fixed; inset: 0;
+        overflow: hidden;
+        z-index: 0;
+        pointer-events: none;   /* タップ・ドラッグはゲームへ通す */
+        user-select: none;
+      }
+
+      /* 回転はこのコンテナに1回だけ掛ける */
+      .wp-bands {
+        position: absolute; top: 50%; left: 50%;
+        width: 160vmax; height: 140vmax;
+        transform: translate(-50%, -50%) rotate(var(--wp-angle));
+        display: flex; flex-direction: column;
+        justify-content: center;
+      }
+
+      .wp-band {
+        flex: 0 0 var(--wp-band-h);
+        display: flex; align-items: center;
+        overflow: hidden;
+        border-top: 2px solid var(--wp-line); /* 帯を隙間なく積むので上線だけにする */
+      }
+
+      .wp-track {
+        display: flex;
+        width: max-content;
+        will-change: transform;
+        animation: wp-scroll var(--wp-dur) linear infinite;
+      }
+
+      /* 1本おきに逆向き（左から右）へ流す */
+      .wp-band--rev .wp-track {
+        animation-direction: reverse;
+      }
+
+      .wp-run {
+        white-space: nowrap;
+        font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        font-size: var(--wp-font);
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: .06em;
+        color: var(--wp-text);
+      }
+
+      /* 右から左へ。同一内容を2本並べているので -50% で継ぎ目なくループする */
+      @keyframes wp-scroll {
+        from { transform: translateX(0); }
+        to   { transform: translateX(-50%); }
+      }
+
+      /* OSで「視差効果を減らす」が有効なときは停止する */
+      @media (prefers-reduced-motion: reduce) {
+        .wp-track { animation: none; }
+      }
+
+      /* ===== ゲーム本体（壁紙の手前） ===== */
+      #game {
+        position: relative; z-index: 1;
+        width: 100%; height: 100%;
+      }
     </style>
   </head>
   <body>
+    <!-- 壁紙。流す文言は data-words をカンマ区切りで編集する（表示データ） -->
+    <div id="wallpaper" aria-hidden="true"
+         data-words="#消しかす,#Keshikasu,#케시카스,#可愛卡薯"
+         data-bands="30"></div>
+
     <div id="game"></div>
+
+    <script>
+      // 斜めティッカーの帯を組み立てる（キャンバス外の装飾）
+      (() => {
+        const root = document.getElementById('wallpaper');
+        if (!root) return;
+
+        const words = (root.dataset.words || '').split(',').filter(Boolean);
+        if (words.length === 0) return;
+
+        const bandCount = Number(root.dataset.bands || 30);
+        const REPEAT = 4;                          // 帯1本が画面幅を確実に超える繰り返し回数
+        const runText = (words.join(' ・ ') + ' ・ ').repeat(REPEAT);
+
+        const bands = document.createElement('div');
+        bands.className = 'wp-bands';
+
+        for (let i = 0; i < bandCount; i++) {
+          const band = document.createElement('div');
+          band.className = 'wp-band';
+          // 1本おきに逆流させる
+          if (i % 2 === 1) band.classList.add('wp-band--rev');
+
+          const track = document.createElement('div');
+          track.className = 'wp-track';
+          // 開始位相をずらし、文字が縦一列に揃うのを防ぐ
+          track.style.animationDelay = `calc(var(--wp-dur) * -${(i % 5) * 0.17})`;
+
+          // 同一内容を2本並べ、-50%移動で無限ループさせる
+          for (let k = 0; k < 2; k++) {
+            const run = document.createElement('span');
+            run.className = 'wp-run';
+            run.textContent = runText;
+            track.appendChild(run);
+          }
+
+          band.appendChild(track);
+          bands.appendChild(band);
+        }
+        root.appendChild(bands);
+      })();
+    </script>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
