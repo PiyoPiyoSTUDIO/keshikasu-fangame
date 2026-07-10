@@ -4,6 +4,7 @@ import { spawnableTiers, tierById } from '../data/merge_ladder';
 import { t } from '../services/i18n';
 import { loadLocalBest, saveLocalBest } from '../services/saveLocal';
 import { submitBest } from '../services/supabase';
+import { attachTapFeedback } from '../ui/tapFeedback';
 
 // ゲーム本体のシーン（タップでケシカスを落として物理で積む）
 export class GameScene extends Phaser.Scene {
@@ -309,12 +310,16 @@ export class GameScene extends Phaser.Scene {
       fontSize: '28px', color: '#ffeef1',
     }).setOrigin(0.5).setDepth(2001);
 
-    // リトライボタン（タップでシーン再起動）
+    // リトライボタン（タップ演出が終わってからシーンを再起動する）
     const retry = this.add.text(w / 2, h / 2 + 150, t('result.retry'), {
       fontSize: '40px', color: '#fce0e3', backgroundColor: '#a8566b',
       padding: { x: 24, y: 12 },
-    }).setOrigin(0.5).setDepth(2001).setInteractive({ useHandCursor: true });;
+    }).setOrigin(0.5).setDepth(2001).setInteractive({ useHandCursor: true });
 
-    retry.on('pointerdown', () => this.scene.restart());
+    // onceは既定のtrueのまま。このボタンは押された瞬間に自分ごと破棄されるため、
+    // 一生に一度だけ発火すれば足りる。錠を掛けたままにすることで、
+    // restartがキューに積まれてから実際に再起動するまでの1フレームの間の
+    // 二重発火も同時に防げる。
+    attachTapFeedback(this, retry, () => this.scene.restart());
   }
 }
