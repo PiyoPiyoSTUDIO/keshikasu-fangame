@@ -1,9 +1,10 @@
 # 20. TDD — 기술 사양서
 
-- **문서 버전**: v1.2 (Phase 1 머지 기준)
+- **문서 버전**: v1.3 (Phase 1 머지 기준)
 - **최종 수정**: 2026-07-09
 - **범위**: Phase 1(머지)의 클라이언트 아키텍처 · 데이터 스키마 · 폴더구조. 서버 상세는 `50_서버사양` 참조.
 - **v1.2 변경점**: `src/ui/` 폴더 신설 반영 / **§7.1 Phaser 4 입력 판정 규칙 신설**(Container 히트영역 함정)
+- **v1.3 변경점(2026-07-13)**: §7.2 탭 피드백 규칙에 retry 실적용(=`once` 기본 true) 반영 / **§7.3 scene.restart() 규칙 신설**(상태 리셋 + 입력 리스너 shutdown 해제) / §9에 restart 리셋 원칙 링크
 
 ---
 
@@ -260,8 +261,35 @@ displayOriginX: { get: function () { return this.width * 0.5; } }
 ### 7.2 탭 피드백 규칙
 - 모든 누를 수 있는 오브젝트는 `ui/tapFeedback.ts`의 `attachTapFeedback()`을 사용한다.
 - **연출 완료 후** 본 처리를 실행한다(`onComplete`). `pointerdown` 즉시 씬을 바꾸면 연출이 보이지 않는다.
-- 씬 전환처럼 1회성 동작은 `once: true`(기본값) → 연타 시 이중 발화 방지.
-- 반복 가능한 버튼은 `{ once: false }`.
+- **`once` 판정 기준(확정)**: **눌린 순간 그 버튼이 파괴되는가**로 정한다.
+  - **파괴형 → `once: true`(기본값)**. 예: START(씬 전환), **retry(`scene.restart()`로 자기까지 파괴)**. 연타해도 1회만 발화되어 이중 실행을 막는다.
+  - **잔존형 → `{ once: false }`**. 눌린 뒤에도 화면에 남아 반복해서 눌러야 하는 버튼(설정 토글 등).
+- ⚠️ **retry는 `once: true`가 정답**이다. "다시하기니까 반복 가능=false"로 오판하기 쉬우나(옛 문서 오류), 버튼 오브젝트 자체는 restart로 파괴되고 다음 `gameOver()`에서 **새로 생성**되므로 각 인스턴스는 1회만 발화하면 된다. (2026-07-13 Cycle 5d 확정, 라이브 U11-b 통과)
+
+### 7.3 ★ scene.restart() 규칙 — 상태 리셋 + 입력 리스너 해제
+`scene.restart()`는 **같은 씬 인스턴스를 재사용**하고 `create()`만 다시 부른다. **생성자와 클래스 필드 초기화자(`private x = 0`)는 재실행되지 않으며**, input 플러그인 등 씬 부속 객체도 파괴되지 않는다. 이를 모르면 아래 2버그가 난다(Cycle 5d에서 GameScene에 실재, 수정 완료).
+
+1. **판 상태는 `create()` 첫머리에서 명시 리셋한다.** 필드 선언의 `= 초기값`에 의존하지 않는다.
+   ```typescript
+   // 例: GameScene.create()先頭
+   this.score = 0;
+   this.canDrop = true;
+   this.nextTierId = 1;
+   this.overTime = 0;
+   this.isGameOver = false;
+   ```
+   - 누락 시: 이전 판의 `isGameOver=true`가 생존 → 재시작 후 드롭 가드에 항상 걸려 **입력 전면 불능**.
+2. **`this.input.on(...)`은 명명 메서드로 등록(context 명시)하고 `shutdown`에서 `off` 해제한다.**
+   ```typescript
+   this.input.on('pointerdown', this.onPointerDown, this);
+   this.events.once('shutdown', () => {
+     this.input.off('pointerdown', this.onPointerDown, this);
+   });
+   ```
+   - 누락 시: restart마다 리스너가 누적 → 탭 1회에 드롭 N회.
+   - `off`가 정확히 먹으려면 **인라인 화살표가 아니라 안정된 함수 참조 + 동일 context**가 필수.
+
+> **적용 대상**: restart로 재사용될 수 있는 모든 씬. QA는 `40` §4 F9(재시작 후 드롭 재개)·F10(반복 무누적)으로 회귀 검증.
 
 ## 8. 합체 처리 흐름
 1. `collisionstart` 이벤트 수신
@@ -274,6 +302,7 @@ displayOriginX: { get: function () { return this.width * 0.5; } }
 - **백업/랭킹**: 온라인이면 `supabase.ts`로 upsert + 상위 N 조회. 실패해도 게임 진행에 영향 없음.
 - **환경변수 부재 시**: `supabase.ts`는 **지연 초기화**(`getClient()`)로 `null`을 반환하고 조용히 생략한다. 모듈 최상단에서 `createClient()`를 호출하면 import 시점에 throw되어 Phaser 부팅 전에 게임이 죽는다. (Cycle 4에서 실제 발생)
 - **only-if-best 판정**: 반드시 `loadLocalBest()`(저장값)와 비교한다. 실시간 갱신되는 `this.best`와 비교하면 게임오버 시점에 항상 동일해져 판정이 무너진다.
+- **재시작 시 런타임 상태**: `scene.restart()`는 필드 초기화자를 재실행하지 않으므로 `isGameOver` 등 판 상태는 `create()`에서 명시 리셋해야 한다. 상세 §7.3.
 
 ## 10. 명명 규칙
 - 파일: 클래스 = PascalCase(`GameScene.ts`), 그 외 = camelCase(`saveLocal.ts`, `tapFeedback.ts`), 데이터 = snake_case(`merge_ladder.ts`)

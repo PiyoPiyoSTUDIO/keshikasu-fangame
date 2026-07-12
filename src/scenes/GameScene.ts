@@ -25,6 +25,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // scene.restart()は同じインスタンスを再利用しcreate()だけを呼ぶ。
+    // クラスフィールドの初期化子は再実行されないため、盤面状態をここで明示リセットする。
+    this.score = 0;
+    this.best = 0;        // 直後にloadLocalBest()で読み直す
+    this.canDrop = true;
+    this.nextTierId = 1;
+    this.overTime = 0;
+    this.isGameOver = false;
+
     const w = this.scale.width;
     const h = this.scale.height;
     const wall = 20; // 壁・床の厚み
@@ -76,9 +85,14 @@ export class GameScene extends Phaser.Scene {
       .setDepth(1000);
     this.pickNext(); // 最初の「次のケシカス」を決める
 
-    // タップした位置にケシカスを落とす
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.dropKeshi(pointer.x);
+    // タップした位置にケシカスを落とす（名前付きメソッドで登録し、contextを明示）
+    this.input.on('pointerdown', this.onPointerDown, this);
+
+    // シーン終了（restart含む）時に入力リスナーを解除する。
+    // scene.restart()ではcreate()が再実行される一方でinputプラグインは生存するため、
+    // 解除しないとpointerdownリスナーが毎回二重に積まれてしまう。
+    this.events.once('shutdown', () => {
+      this.input.off('pointerdown', this.onPointerDown, this);
     });
 
     // 衝突したら合体判定＋着地スクワッシュを行う
@@ -129,6 +143,11 @@ export class GameScene extends Phaser.Scene {
     const targetH = 56;
     const ratio = targetH / this.nextPreview.height; // テクスチャ実寸から倍率を算出
     this.nextPreview.setScale(ratio);
+  }
+
+  // pointerdownハンドラ（offで確実に解除できるよう名前付きメソッドにする）
+  private onPointerDown(pointer: Phaser.Input.Pointer) {
+    this.dropKeshi(pointer.x);
   }
 
   // ドロップ可能な段階（1〜3段）からランダムに1つ選んで落とす
